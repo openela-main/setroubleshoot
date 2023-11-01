@@ -1,0 +1,70 @@
+From a2102cb35cd45852fc508b2f62400be098050d7a Mon Sep 17 00:00:00 2001
+From: Vit Mojzis <vmojzis@redhat.com>
+Date: Mon, 4 Jul 2022 16:20:30 +0200
+Subject: [PATCH] Decrease setroubleshootd priority and limit RAM utilization
+ to 1GB
+
+This should help with system responsiveness in case of large amount of
+AVCs. The memory limit ensures the process cannot indefinitely hog
+memory in case it is running continuously. My testing showed normal
+memory consumption not to exceed 350MB, so 1GB should not limit normal
+operation.
+
+Note: Limiting memory using systemd service file was chosen to make it easier
+for users to adjust the limits.
+
+Related:
+https://bugzilla.redhat.com/show_bug.cgi?id=2064727
+
+Signed-off-by: Vit Mojzis <vmojzis@redhat.com>
+---
+ Makefile.am                               |  3 +++
+ org.fedoraproject.Setroubleshootd.service |  3 ++-
+ setroubleshootd.service                   | 10 ++++++++++
+ 3 files changed, 15 insertions(+), 1 deletion(-)
+ create mode 100644 setroubleshootd.service
+
+diff --git a/framework/Makefile.am b/framework/Makefile.am
+index f330b7c..93c6a06 100644
+--- a/framework/Makefile.am
++++ b/framework/Makefile.am
+@@ -28,6 +28,9 @@ polkit_systemdir = $(datadir)/polkit-1/actions
+ polkit_system_DATA = \
+ 			org.fedoraproject.setroubleshootfixit.policy
+ 
++systemd_systemunitdir = $(prefix)/lib/systemd/system/
++systemd_systemunit_DATA = setroubleshootd.service
++
+ autostartdir = $(sysconfdir)/xdg/autostart
+ autostart_DATA = sealertauto.desktop
+ 
+diff --git a/framework/org.fedoraproject.Setroubleshootd.service b/framework/org.fedoraproject.Setroubleshootd.service
+index 05c2c39..2c52499 100644
+--- a/framework/org.fedoraproject.Setroubleshootd.service
++++ b/framework/org.fedoraproject.Setroubleshootd.service
+@@ -1,4 +1,5 @@
+ [D-BUS Service]
+ Name=org.fedoraproject.Setroubleshootd
+-Exec=/usr/sbin/setroubleshootd -f 
++SystemdService=setroubleshootd.service
++Exec=/bin/false
+ User=setroubleshoot
+diff --git a/framework/setroubleshootd.service b/framework/setroubleshootd.service
+new file mode 100644
+index 0000000..81c75b1
+--- /dev/null
++++ b/framework/setroubleshootd.service
+@@ -0,0 +1,10 @@
++[Unit]
++Description=SETroubleshoot daemon for processing new SELinux denial logs
++
++[Service]
++Type=dbus
++BusName=org.fedoraproject.Setroubleshootd
++ExecStart=/usr/sbin/setroubleshootd -f
++User=setroubleshoot
++LimitAS=1G
++Nice=5
+-- 
+2.35.3
+

@@ -1,0 +1,45 @@
+From eed06d0f11867c1019fee4fb1a80be775a60d74e Mon Sep 17 00:00:00 2001
+From: Vit Mojzis <vmojzis@redhat.com>
+Date: Mon, 11 Jul 2022 18:20:47 +0200
+Subject: [PATCH] doc: Document performance related changes
+
+- Setroubleshootd is now executed using setroubleshootd.service
+- ^^ is limited to 1GB of RAM and has a lower than normal priority
+
+Signed-off-by: Vit Mojzis <vmojzis@redhat.com>
+---
+ doc/setroubleshootd.8 | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/framework/doc/setroubleshootd.8 b/framework/doc/setroubleshootd.8
+index bed6713..f1f04d8 100644
+--- a/framework/doc/setroubleshootd.8
++++ b/framework/doc/setroubleshootd.8
+@@ -23,9 +23,14 @@ components, sealert and setroubleshootd.
+ setroubleshootd is a system daemon which runs under setroubleshoot user and
+ listens for audit events emitted from the kernel related to SELinux. When the
+ setroubleshootd daemon sees an SELinux AVC denial it runs a series of analysis
+-plugins which examines the audit data related to the AVC. It records the
++plugins which examine the audit data related to the AVC. It records the
+ results of the analysis and signals any clients which have attached to the
+ setroubleshootd daemon that a new alert has been seen.
++.P
++setroubleshootd is not persistent and only runs when there are new AVCs to be
++analyzed. It is executed using setroubleshootd.service, which also limits its
++priority and maximum RAM utilization to 1GB, in order to help with system
++responsiveness in case of large amounts of AVCs.
+ 
+ .SH "OPTIONS"
+ .TP 
+@@ -33,7 +38,7 @@ setroubleshootd daemon that a new alert has been seen.
+ Do not fork the daemon
+ .TP 
+ .B \-d \-\-debug
+-Do not exit after 10 seconds
++Do not exit after 10 seconds of inactivity
+ .TP 
+ .B \-h \-\-help           
+ Show this message
+-- 
+2.35.3
+
