@@ -1,0 +1,56 @@
+From 2fbc58c26359989894dfb54daaca2ff4b537f4fe Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Christian=20G=C3=B6ttsche?= <cgzones@googlemail.com>
+Date: Fri, 22 Apr 2022 16:27:30 +0200
+Subject: [PATCH] setroubleshoot/server: shutdown RunFaultServer nicely
+
+    systemd[1]: dbus-:1.2-org.fedoraproject.Setroubleshootd@2.service: Main process exited, code=killed, status=14/ALRM
+    systemd[1]: dbus-:1.2-org.fedoraproject.Setroubleshootd@2.service: Failed with result 'signal'.
+    audit[1]: SERVICE_STOP pid=1 uid=0 auid=4294967295 ses=4294967295 subj=system_u:system_r:systemd_t:s0 msg='unit=dbus-:1.2-org.fedoraproject.Setroubleshootd@2 comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=failed'
+---
+ src/setroubleshoot/server.py | 14 +++++++++++---
+ 1 file changed, 11 insertions(+), 3 deletions(-)
+
+diff --git a/framework/src/setroubleshoot/server.py b/framework/src/setroubleshoot/server.py
+index 10ef215..8f16993 100755
+--- a/framework/src/setroubleshoot/server.py
++++ b/framework/src/setroubleshoot/server.py
+@@ -733,9 +733,17 @@ def goodbye(database):
+     audit2why.finish()
+ 
+ 
++main_loop = GLib.MainLoop()
++
++
++def alarm_handler(signum, frame):
++    log_debug("SIGALRM raised in RunFaultServer")
++    main_loop.quit()
++
++
+ def RunFaultServer(timeout=10):
+     signal.alarm(timeout)
+-    sigalrm_handler = signal.signal(signal.SIGALRM, polling_failed_handler)
++    signal.signal(signal.SIGALRM, polling_failed_handler)
+     # polling for /sys/fs/selinux/policy file
+     while True:
+         try:
+@@ -760,7 +768,7 @@ def RunFaultServer(timeout=10):
+ 
+     global host_database, analysis_queue, email_recipients
+ 
+-    signal.signal(signal.SIGALRM, sigalrm_handler)
++    signal.signal(signal.SIGALRM, alarm_handler)
+     signal.signal(signal.SIGHUP, sighandler)
+ 
+     #interface_registry.dump_interfaces()
+@@ -856,7 +864,7 @@ def RunFaultServer(timeout=10):
+ 
+         dbus.glib.init_threads()
+         setroubleshootd_dbus = SetroubleshootdDBus(analysis_queue, alert_receiver, timeout)
+-        main_loop = GLib.MainLoop()
++
+         main_loop.run()
+ 
+     except KeyboardInterrupt as e:
+-- 
+2.35.3
+

@@ -1,0 +1,174 @@
+From e0cf9f2e50e8da856ffd511cbbab7ee36a31bb74 Mon Sep 17 00:00:00 2001
+From: Vit Mojzis <vmojzis@redhat.com>
+Date: Fri, 10 Dec 2021 15:04:21 +0100
+Subject: [PATCH] Revert "Replace pydbus with dasbus"
+
+dasbus is not available in rhel8.
+
+This reverts commit 5290ca0ee06d69102bf2b756e2decc0f8c5b770f.
+---
+ configure.ac                    |  6 +++---
+ src/SetroubleshootPrivileged.py | 32 ++++++++++++++------------------
+ src/seapplet                    | 21 +++++++++++++--------
+ src/setroubleshoot/util.py      |  9 +++------
+ 4 files changed, 33 insertions(+), 35 deletions(-)
+
+diff --git a/framework/configure.ac b/framework/configure.ac
+index d1d0176..e3b7b5a 100644
+--- a/framework/configure.ac
++++ b/framework/configure.ac
+@@ -65,13 +65,13 @@ else
+                    $python_module_result])
+ fi
+ 
+-AC_MSG_CHECKING([for the dasbus python3 module])
+-python_module_result=`$PYTHON -c "import dasbus" 2>&1`
++AC_MSG_CHECKING([for the pydbus python3 module])
++python_module_result=`$PYTHON -c "import pydbus" 2>&1`
+ if test -z "$python_module_result"; then
+ 	AC_MSG_RESULT([yes])
+ else
+ 	AC_MSG_RESULT([no])
+-	AC_MSG_ERROR([cannot import Python3 module dasbus.
++	AC_MSG_ERROR([cannot import Python3 module pydbus.
+                    Please check your Python3 installation. The error was:
+                    $python_module_result])
+ fi
+diff --git a/framework/src/SetroubleshootPrivileged.py b/framework/src/SetroubleshootPrivileged.py
+index d2a9ea4..899e687 100644
+--- a/framework/src/SetroubleshootPrivileged.py
++++ b/framework/src/SetroubleshootPrivileged.py
+@@ -19,23 +19,23 @@
+ # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ 
+ from gi.repository import GLib
+-from dasbus.connection import SystemMessageBus
++from pydbus import SystemBus
+ import setroubleshoot.util
+ import signal
+ 
+ loop = GLib.MainLoop()
+ 
+ class Privileged(object):
+-    __dbus_xml__ = """
+-    <node>
+-        <interface name='org.fedoraproject.SetroubleshootPrivileged'>
+-            <method name='get_rpm_nvr_by_scontext'>
+-                <arg type='s' name='scontext' direction='in'/>
+-                <arg type='s' name='rpmnvr' direction='out'/>
+-            </method>
+-            <method name='finish'/>
+-        </interface>
+-    </node>
++    """
++		<node>
++			<interface name='org.fedoraproject.SetroubleshootPrivileged'>
++				<method name='get_rpm_nvr_by_scontext'>
++					<arg type='s' name='scontext' direction='in'/>
++    				<arg type='s' name='rpmnvr' direction='out'/>
++				</method>
++				<method name='finish'/>
++			</interface>
++		</node>
+     """
+ 
+     def __init__(self, timeout=10):
+@@ -58,10 +58,6 @@ class Privileged(object):
+         loop.quit()
+ 
+ if __name__ == "__main__":
+-    bus = SystemMessageBus()
+-    try:
+-        bus.publish_object("/org/fedoraproject/SetroubleshootPrivileged", Privileged())
+-        bus.register_service("org.fedoraproject.SetroubleshootPrivileged")
+-        loop.run()
+-    finally:
+-        bus.disconnect()
++    bus = SystemBus()
++    bus.publish("org.fedoraproject.SetroubleshootPrivileged", Privileged())
++    loop.run()
+diff --git a/framework/src/seapplet b/framework/src/seapplet
+index b5f65d1..79b5ef2 100644
+--- a/framework/src/seapplet
++++ b/framework/src/seapplet
+@@ -26,7 +26,7 @@ from gi.repository import Gtk
+ gi.require_version('Notify', '0.7')
+ from gi.repository import Notify
+ 
+-from dasbus.connection import SystemMessageBus
++from pydbus import SystemBus
+ 
+ import selinux
+ import sys
+@@ -52,14 +52,13 @@ class SEApplet(GObject.Object):
+ 
+     def __init__(self):
+ 
+-        bus = SystemMessageBus()
+-        Setroubleshootd = bus.get_proxy(
+-            'org.fedoraproject.Setroubleshootd',
+-            '/org/fedoraproject/Setroubleshootd'
++        bus = SystemBus()
++        self.bus_signal = bus.subscribe(
++            iface='org.fedoraproject.SetroubleshootdIface',
++            signal='alert',
++            signal_fired=self.send_notification
+         )
+ 
+-        Setroubleshootd.alert.connect(self.send_notification)
+-
+         super(SEApplet, self).__init__()
+         Notify.init("seapplet")
+         # lets initialise with the application name
+@@ -81,6 +80,11 @@ class SEApplet(GObject.Object):
+         except:
+             pass
+ 
++        Setroubleshootd = bus.get(
++            'org.fedoraproject.Setroubleshootd',
++            '/org/fedoraproject/Setroubleshootd'
++        )
++
+         (count, red) = Setroubleshootd.check_for_new(last_id)
+ 
+         if count > 0:
+@@ -115,7 +119,8 @@ class SEApplet(GObject.Object):
+         launcher.launch(None, context)
+         self.status_icon.set_visible(False)
+ 
+-    def send_notification(self, *params):
++    def send_notification(self, sender, dobject, iface, signal, params):
++
+         status_icon = self.__init_status_icon()
+         status_icon.set_visible(True)
+ 
+diff --git a/framework/src/setroubleshoot/util.py b/framework/src/setroubleshoot/util.py
+index 02c4f75..657c882 100755
+--- a/framework/src/setroubleshoot/util.py
++++ b/framework/src/setroubleshoot/util.py
+@@ -69,7 +69,7 @@ __all__ = [
+ import bz2
+ import six
+ import datetime
+-from dasbus.connection import SystemMessageBus
++from pydbus import SystemBus
+ import glob
+ from gi.repository import GObject
+ import os
+@@ -522,11 +522,8 @@ Finds an SELinux module which defines given SELinux context
+ 
+     """
+     if use_dbus:
+-        bus = SystemMessageBus()
+-        remote_object = bus.get_proxy(
+-            "org.fedoraproject.SetroubleshootPrivileged",
+-            "/org/fedoraproject/SetroubleshootPrivileged"
+-        )
++        bus = SystemBus()
++        remote_object = bus.get("org.fedoraproject.SetroubleshootPrivileged")
+         return str(remote_object.get_rpm_nvr_by_scontext(str(scontext)))
+     else:
+         context = selinux.context_new(str(scontext))
+-- 
+2.30.2
+

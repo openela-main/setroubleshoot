@@ -1,0 +1,40 @@
+From 73d60acf9d4d7ae740d450f9c9a9566dac1c3111 Mon Sep 17 00:00:00 2001
+From: Petr Lautrbach <plautrba@redhat.com>
+Date: Thu, 3 Feb 2022 18:14:05 +0100
+Subject: [PATCH] Improve after_first email filter behavior
+
+after_first used to send 2 emails before it started to filter. The
+problem was in the email users were not saved into database when a new
+signature was created.
+
+Also we need to skip email users when we evaluated whether send a
+desktop notification or not.
+---
+ src/setroubleshoot/server.py | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/framework/src/setroubleshoot/server.py b/framework/src/setroubleshoot/server.py
+index 771ea15..10ef215 100755
+--- a/framework/src/setroubleshoot/server.py
++++ b/framework/src/setroubleshoot/server.py
+@@ -220,6 +220,7 @@ class AlertPluginReportReceiver(PluginReportReceiver):
+             if len(to_addrs):
+                 from setroubleshoot.email_alert import email_alert
+                 email_alert(siginfo, to_addrs)
++            self.database.mark_modified()
+ 
+         log_debug("sending alert to all clients")
+ 
+@@ -234,6 +235,9 @@ class AlertPluginReportReceiver(PluginReportReceiver):
+             systemd.journal.send(siginfo.format_text(), OBJECT_PID=pid, SYSLOG_IDENTIFIER=pkg_name)
+ 
+         for u in siginfo.users:
++            if u.username[0:6] == "email:":
++                # skip email users - they were evaluated before
++                continue
+             action = siginfo.evaluate_filter_for_user(u.username)
+             if action == "ignore":
+                 return siginfo
+-- 
+2.30.2
+
