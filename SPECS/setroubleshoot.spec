@@ -3,21 +3,23 @@
 
 Summary: Helps troubleshoot SELinux problems
 Name: setroubleshoot
-Version: 3.3.31
-Release: 2%{?dist}
-License: GPLv2+
+Version: 3.3.32
+Release: 1%{?dist}
+License: GPL-2.0-or-later
 URL: https://gitlab.com/setroubleshoot/setroubleshoot
 Source0: https://gitlab.com/setroubleshoot/setroubleshoot/-/archive/%{version}/setroubleshoot-%{version}.tar.gz
 Source1: %{name}.tmpfiles
 Source2: %{name}.sysusers
-# git format-patch -N 3.3.28
+# git format-patch -N 3.3.32
 # i=1; for j in 00*patch; do printf "Patch%04d: %s\n" $i $j; i=$((i+1));done
-Patch0001: 0001-Update-translations.patch
+Patch0001: 0001-imp-module-is-deprecated-in-favor-of-importlib.patch
+Patch0002: 0002-Always-reset-pending-alarms-when-alarm-0.patch
+Patch0003: 0003-gitlab-ci-use-apt-get-to-install-python3-dbus-packag.patch
 BuildRequires: gcc
 BuildRequires: make
 BuildRequires: libcap-ng-devel
-BuildRequires: intltool gettext python3 python3-devel python3-setuptools python3-pip
-BuildRequires: desktop-file-utils dbus-glib-devel libnotify-devel libselinux-devel polkit-devel
+BuildRequires: intltool gettext python3 python3-devel python3-setuptools python3-wheel python3-pip
+BuildRequires: desktop-file-utils libnotify-devel libselinux-devel polkit-devel
 BuildRequires: audit-libs-devel >= 3.0.1
 BuildRequires: python3-libselinux python3-dasbus python3-gobject gtk3-devel
 # for the _tmpfilesdir macro
@@ -55,7 +57,7 @@ to user preference. The same tools can be run on existing log files.
 %config(noreplace) %{_sysconfdir}/xdg/autostart/*
 %{_datadir}/applications/*.desktop
 %{_metainfodir}/*.appdata.xml
-%{_datadir}/dbus-1/services/sealert.service
+%{_datadir}/dbus-1/services/org.fedoraproject.sealert.service
 %{_datadir}/icons/hicolor/*/*/*
 %dir %attr(0755,root,root) %{pkgpythondir}
 %{pkgpythondir}/browser.py
@@ -103,7 +105,7 @@ BuildRequires: python3-devel
 Requires: systemd-python3 >= 206-1
 Requires: python3-gobject-base >= 3.11
 Requires: dbus
-Requires: python3-dbus python3-dasbus
+Requires: python3-dbus python3-dasbus python3-six
 Requires: polkit
 Requires: initscripts-service
 
@@ -126,7 +128,7 @@ to user preference. The same tools can be run on existing log files.
 %{_bindir}/sealert
 %{_sbindir}/sedispatch
 %{_sbindir}/setroubleshootd
-%{python3_sitelib}/setroubleshoot*.egg-info
+%{python3_sitelib}/setroubleshoot*.dist-info
 %dir %attr(0755,root,root) %{pkgconfigdir}
 %dir %{pkgpythondir}
 %dir %{pkgpythondir}/__pycache__
@@ -192,6 +194,16 @@ to user preference. The same tools can be run on existing log files.
 %doc AUTHORS COPYING ChangeLog DBUS.md NEWS README TODO
 
 %changelog
+* Thu Jul 27 2023 Petr Lautrbach <lautrbach@redhat.com> - 3.3.32-1
+- Always reset pending alarms when alarm(0) (rhbz#2112573)
+- 'imp' module is deprecated in favor of 'importlib' (rhbz#2224393)
+- Fix build with pip 23.1.2+
+- Remove dbus-glib-devel BR as it's only needed when compiled with seappletlegacy
+- Rename session bus name to org.fedoraproject.sealert
+- seapplet: wrap SEApplet() to try except
+- util.py: Add doctext test for build_module_type_cache()
+- Update translations
+
 * Thu Mar 09 2023 Vit Mojzis <vmojzis@redhat.com> - 3.3.31-2
 - Update translations (#2139682)
 
